@@ -1,6 +1,6 @@
 [package]
-name = "sievert"
-version = "0.3.0"
+name = "sievers"
+version = "0.3.1"
 edition = "2021"
 description = "SIEVE email filter manager"
 

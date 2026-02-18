@@ -2,5 +2,5 @@ use directories::ProjectDirs;
 use std::path::PathBuf;
 
 pub fn config_dir() -> Option<PathBuf> {
-    ProjectDirs::from("", "", "Sievert").map(|d| d.config_dir().to_path_buf())
+    ProjectDirs::from("", "", "Sievers").map(|d| d.config_dir().to_path_buf())
 }

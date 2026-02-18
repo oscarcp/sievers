@@ -19,7 +19,7 @@ pub fn view<'a>(connected: bool, dark_mode: bool) -> Element<'a, Message> {
             weight: iced::font::Weight::Bold,
             ..Font::DEFAULT
         }),
-        text("RT").size(20),
+        text("RS").size(20),
     ]
     .spacing(0)
     .align_y(iced::Alignment::Center);
@@ -34,6 +34,7 @@ pub fn view<'a>(connected: bool, dark_mode: bool) -> Element<'a, Message> {
         toolbar_button(icons::UPLOAD_CLOUD, "Upload", Message::Upload),
         horizontal_space().width(Length::Fill),
         toolbar_button(theme_icon, theme_label, Message::ToggleTheme),
+        toolbar_button(icons::INFORMATION, "About", Message::ShowAbout),
     ]
     .spacing(4)
     .padding(6)

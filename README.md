@@ -1,6 +1,16 @@
-# Sievert
+# Sievers
 
-SIEVE Filter Manager — GUI for managing email filter scripts.
+SIEVERS — Cross-platform SIEVE filter editor written in Rust
+
+## Screenshots
+
+![Main window](assets/screenshot01.png)
+
+![Visual editor](assets/screenshot03.png)
+
+![Raw editor](assets/screenshot04.png)
+
+![Connection modal](assets/screenshot02.png)
 
 ## Building
 
@@ -27,7 +37,7 @@ Build:
 cargo build --release
 ```
 
-Binary output: `target/release/sievert`
+Binary output: `target/release/sievers`
 
 ### Windows (cross-compile from Linux)
 
@@ -38,7 +48,7 @@ cargo install cross --git https://github.com/cross-rs/cross
 cross build --release --target x86_64-pc-windows-gnu
 ```
 
-Binary output: `target/x86_64-pc-windows-gnu/release/sievert.exe`
+Binary output: `target/x86_64-pc-windows-gnu/release/sievers.exe`
 
 > **Note:** For a polished Windows release (proper icon, no console flash), building natively on Windows with the MSVC toolchain (`x86_64-pc-windows-msvc`) is recommended.
 
@@ -58,9 +68,9 @@ cargo build --release --target x86_64-apple-darwin
 
 # Universal binary (optional)
 lipo -create \
-  target/x86_64-apple-darwin/release/sievert \
-  target/aarch64-apple-darwin/release/sievert \
-  -output sievert-universal
+  target/x86_64-apple-darwin/release/sievers \
+  target/aarch64-apple-darwin/release/sievers \
+  -output sievers-universal
 ```
 
 ### Release profile

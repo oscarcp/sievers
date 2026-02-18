@@ -15,6 +15,7 @@ use crate::store::{profile_store, script_io};
 use crate::ui;
 use crate::ui::action_row::ActionMessage;
 use crate::ui::condition_row::ConditionMessage;
+use crate::ui::about_modal::{AboutMessage, AboutState};
 use crate::ui::connection_modal::{ConnectionMessage, ConnectionState};
 use crate::ui::rule_card::RuleMessage;
 use crate::ui::script_list::ScriptListMessage;
@@ -27,7 +28,7 @@ pub enum Tab {
     Raw,
 }
 
-pub struct Sievert {
+pub struct Sievers {
     // Editor state
     pub editor_content: text_editor::Content,
     pub rules: Vec<SieveRule>,
@@ -51,6 +52,9 @@ pub struct Sievert {
     // Theme
     pub dark_mode: bool,
 
+    // About
+    pub about: AboutState,
+
     // Sync state
     syncing: bool,
     raw_dirty: bool,
@@ -65,6 +69,8 @@ pub enum Message {
     SaveFile,
     Upload,
     ToggleTheme,
+    ShowAbout,
+    AboutMsg(AboutMessage),
 
     // Tab
     SwitchTab(Tab),
@@ -101,7 +107,7 @@ pub enum Message {
     ScriptListMsg(ScriptListMessage),
 }
 
-impl Default for Sievert {
+impl Default for Sievers {
     fn default() -> Self {
         Self {
             editor_content: text_editor::Content::new(),
@@ -117,6 +123,7 @@ impl Default for Sievert {
             client: Arc::new(Mutex::new(ManageSieveClient::new())),
             selected_rule: None,
             dark_mode: false,
+            about: AboutState::default(),
             syncing: false,
             raw_dirty: false,
             last_raw_edit: None,
@@ -124,10 +131,20 @@ impl Default for Sievert {
     }
 }
 
-pub fn update(state: &mut Sievert, message: Message) -> Task<Message> {
+pub fn update(state: &mut Sievers, message: Message) -> Task<Message> {
     match message {
         Message::ToggleTheme => {
             state.dark_mode = !state.dark_mode;
+            Task::none()
+        }
+
+        Message::ShowAbout => {
+            state.about.visible = true;
+            Task::none()
+        }
+
+        Message::AboutMsg(AboutMessage::Close) => {
+            state.about.visible = false;
             Task::none()
         }
 
@@ -411,7 +428,7 @@ pub fn update(state: &mut Sievert, message: Message) -> Task<Message> {
     }
 }
 
-fn handle_connection_message(state: &mut Sievert, msg: ConnectionMessage) -> Task<Message> {
+fn handle_connection_message(state: &mut Sievers, msg: ConnectionMessage) -> Task<Message> {
     match msg {
         ConnectionMessage::SelectProfile(name) => {
             if let Some(idx) = state.connection.profiles.iter().position(|p| p.name == name) {
@@ -506,7 +523,7 @@ fn handle_connection_message(state: &mut Sievert, msg: ConnectionMessage) -> Tas
     }
 }
 
-fn handle_script_list_message(state: &mut Sievert, msg: ScriptListMessage) -> Task<Message> {
+fn handle_script_list_message(state: &mut Sievers, msg: ScriptListMessage) -> Task<Message> {
     match msg {
         ScriptListMessage::SelectScript(name) => {
             state.selected_script = Some(name.clone());
@@ -573,7 +590,7 @@ fn handle_script_list_message(state: &mut Sievert, msg: ScriptListMessage) -> Ta
     }
 }
 
-fn refresh_scripts(state: &mut Sievert) -> Task<Message> {
+fn refresh_scripts(state: &mut Sievers) -> Task<Message> {
     let client = state.client.clone();
     Task::perform(
         async move {
@@ -588,7 +605,7 @@ fn refresh_scripts(state: &mut Sievert) -> Task<Message> {
     )
 }
 
-fn handle_rule_message(state: &mut Sievert, idx: usize, msg: RuleMessage) {
+fn handle_rule_message(state: &mut Sievers, idx: usize, msg: RuleMessage) {
     let rule = &mut state.rules[idx];
     match msg {
         RuleMessage::SetName(name) => rule.name = name,
@@ -650,7 +667,7 @@ fn handle_action_message(actions: &mut Vec<Action>, idx: usize, msg: ActionMessa
 
 // --- Bidirectional sync ---
 
-fn sync_visual_to_raw(state: &mut Sievert) {
+fn sync_visual_to_raw(state: &mut Sievers) {
     state.syncing = true;
     let script = crate::model::script::SieveScript {
         rules: state.rules.clone(),
@@ -663,7 +680,7 @@ fn sync_visual_to_raw(state: &mut Sievert) {
     state.syncing = false;
 }
 
-fn sync_raw_to_visual(state: &mut Sievert) {
+fn sync_raw_to_visual(state: &mut Sievers) {
     state.syncing = true;
     let text = state.editor_content.text();
     let script = converter::text_to_script(&text, "");
@@ -689,7 +706,7 @@ fn sync_raw_to_visual(state: &mut Sievert) {
 
 // --- View ---
 
-pub fn view(state: &Sievert) -> Element<'_, Message> {
+pub fn view(state: &Sievers) -> Element<'_, Message> {
     let toolbar = ui::toolbar::view(state.connected, state.dark_mode);
     let tab_bar = view_tab_bar(state.active_tab);
 
@@ -727,6 +744,15 @@ pub fn view(state: &Sievert) -> Element<'_, Message> {
         content = iced::widget::stack![
             content,
             ui::connection_modal::view(&state.connection).map(Message::ConnectionMsg),
+        ]
+        .into();
+    }
+
+    // About modal overlay
+    if state.about.visible {
+        content = iced::widget::stack![
+            content,
+            ui::about_modal::view(&state.about).map(Message::AboutMsg),
         ]
         .into();
     }
@@ -774,7 +800,7 @@ fn view_tab_bar(active: Tab) -> Element<'static, Message> {
     .into()
 }
 
-pub fn theme(state: &Sievert) -> Theme {
+pub fn theme(state: &Sievers) -> Theme {
     if state.dark_mode {
         Theme::Dark
     } else {
@@ -782,7 +808,7 @@ pub fn theme(state: &Sievert) -> Theme {
     }
 }
 
-pub fn subscription(state: &Sievert) -> Subscription<Message> {
+pub fn subscription(state: &Sievers) -> Subscription<Message> {
     let mut subs = vec![iced::keyboard::on_key_press(handle_key_press)];
 
     if state.raw_dirty && state.last_raw_edit.is_some() {

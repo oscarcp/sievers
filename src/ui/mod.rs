@@ -1,3 +1,4 @@
+pub mod about_modal;
 pub mod action_row;
 pub mod condition_row;
 pub mod connection_modal;

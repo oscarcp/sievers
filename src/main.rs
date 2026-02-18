@@ -9,7 +9,7 @@ mod store;
 mod ui;
 
 pub fn main() -> iced::Result {
-    iced::application("Sievert — SIEVE Filter Manager", app::update, app::view)
+    iced::application("Sievers — SIEVE Filter Manager", app::update, app::view)
         .subscription(app::subscription)
         .theme(app::theme)
         .font(ui::icons::ICON_FONT_BYTES)

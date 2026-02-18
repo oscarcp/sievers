@@ -17,6 +17,7 @@ pub const SERVER: char = '\u{f0e0}';         // server-line
 pub const DELETE_BIN: char = '\u{ec1d}';     // delete-bin-line
 pub const SUN: char = '\u{f1bc}';            // sun-line
 pub const MOON: char = '\u{ef72}';           // moon-line
+pub const INFORMATION: char = '\u{ee58}';    // information-line
 
 /// Create an icon + label button content.
 pub fn icon_text<'a, M: 'a>(icon: char, label: &'a str) -> Element<'a, M> {
