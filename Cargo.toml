@@ -1,8 +1,8 @@
 [package]
 name = "sievers"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
-description = "SIEVE email filter manager"
+description = "SIEVERS — Cross-platform SIEVE filter editor written in Rust "
 
 [dependencies]
 iced = { version = "0.13", features = ["tokio"] }
