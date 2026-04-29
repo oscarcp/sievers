@@ -87,6 +87,13 @@ fn extract_filter_name(comment: &Option<String>) -> Option<String> {
             } else {
                 Some(name.to_string())
             }
+        } else if let Some((_, rest)) = trimmed.split_once("Rulename:") {
+            let name = rest.split('|').next().unwrap_or("").trim();
+            if name.is_empty() {
+                None
+            } else {
+                Some(name.to_string())
+            }
         } else {
             None
         }
@@ -215,6 +222,10 @@ fn parse_test_expr(tokens: &[&Token], pos: &mut usize) -> Result<TestExpr, Strin
                 "body" => {
                     *pos += 1;
                     parse_body_test(tokens, pos)
+                }
+                "hasflag" => {
+                    *pos += 1;
+                    parse_hasflag_test(tokens, pos)
                 }
                 "true" => {
                     *pos += 1;
@@ -375,6 +386,15 @@ fn parse_body_test(tokens: &[&Token], pos: &mut usize) -> Result<TestExpr, Strin
             }
             continue;
         }
+        if matches!(tag.as_str(), ":text" | ":raw") {
+            *pos += 1;
+            continue;
+        }
+        if tag == ":content" {
+            *pos += 1;
+            let _ = parse_string_or_list(tokens, pos)?;
+            continue;
+        }
         match_type = tag.clone();
         *pos += 1;
     }
@@ -382,6 +402,36 @@ fn parse_body_test(tokens: &[&Token], pos: &mut usize) -> Result<TestExpr, Strin
     let keys = parse_string_or_list(tokens, pos)?;
 
     Ok(TestExpr::Body { match_type, keys })
+}
+
+fn parse_hasflag_test(tokens: &[&Token], pos: &mut usize) -> Result<TestExpr, String> {
+    let mut match_type = ":is".to_string();
+
+    while let Some(Token::Tag(tag)) = tokens.get(*pos) {
+        if tag == ":comparator" {
+            *pos += 1;
+            if matches!(tokens.get(*pos), Some(Token::QuotedString(_))) {
+                *pos += 1;
+            }
+            continue;
+        }
+        match_type = tag.clone();
+        *pos += 1;
+    }
+
+    let first = parse_string_or_list(tokens, pos)?;
+    let second = parse_string_or_list(tokens, pos)?;
+    let (variable_names, flags) = if second.is_empty() {
+        (Vec::new(), first)
+    } else {
+        (first, second)
+    };
+
+    Ok(TestExpr::HasFlag {
+        match_type,
+        variable_names,
+        flags,
+    })
 }
 
 fn parse_string_or_list(tokens: &[&Token], pos: &mut usize) -> Result<Vec<String>, String> {
@@ -588,6 +638,42 @@ if allof (header :is "From" "boss@example.com", header :contains "Subject" "urge
                     assert_eq!(keys, &["hapimag.com"]);
                 }
                 _ => panic!("Expected Address test"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_hasflag_and_body_text() {
+        let input = r#"if allof (not hasflag :is "$label", body :contains :text "token.example") {
+    addflag "$label";
+}"#;
+        let script = parse(input).unwrap();
+        let if_cmd = script.commands.iter().find(|c| matches!(c, Command::If(_)));
+        if let Some(Command::If(block)) = if_cmd {
+            match &block.condition {
+                TestExpr::AllOf(tests) => {
+                    assert_eq!(tests.len(), 2);
+                    match &tests[0] {
+                        TestExpr::Not(inner) => match inner.as_ref() {
+                            TestExpr::HasFlag {
+                                match_type, flags, ..
+                            } => {
+                                assert_eq!(match_type, ":is");
+                                assert_eq!(flags, &["$label"]);
+                            }
+                            _ => panic!("Expected HasFlag test"),
+                        },
+                        _ => panic!("Expected negated HasFlag"),
+                    }
+                    match &tests[1] {
+                        TestExpr::Body { match_type, keys } => {
+                            assert_eq!(match_type, ":contains");
+                            assert_eq!(keys, &["token.example"]);
+                        }
+                        _ => panic!("Expected Body test"),
+                    }
+                }
+                _ => panic!("Expected AllOf"),
             }
         }
     }

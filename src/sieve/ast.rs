@@ -90,6 +90,12 @@ pub enum TestExpr {
         match_type: String,
         keys: Vec<String>,
     },
+    /// `hasflag :match_type ["variable"] "flag"`
+    HasFlag {
+        match_type: String,
+        variable_names: Vec<String>,
+        flags: Vec<String>,
+    },
     /// `true`
     True,
     /// `false`

@@ -199,6 +199,20 @@ fn emit_test_expr(out: &mut String, expr: &TestExpr) {
             out.push(' ');
             emit_string_or_list(out, keys);
         }
+        TestExpr::HasFlag {
+            match_type,
+            variable_names,
+            flags,
+        } => {
+            out.push_str("hasflag ");
+            out.push_str(match_type);
+            if !variable_names.is_empty() {
+                out.push(' ');
+                emit_string_or_list(out, variable_names);
+            }
+            out.push(' ');
+            emit_string_or_list(out, flags);
+        }
         TestExpr::True => out.push_str("true"),
         TestExpr::False => out.push_str("false"),
     }
@@ -287,6 +301,12 @@ fn collect_test_requires(expr: &TestExpr, requires: &mut std::collections::BTree
         }
         TestExpr::Body { .. } => {
             requires.insert("body".to_string());
+        }
+        TestExpr::HasFlag { match_type, .. } => {
+            requires.insert("imap4flags".to_string());
+            if match_type == ":regex" {
+                requires.insert("regex".to_string());
+            }
         }
         TestExpr::Header { match_type, .. }
         | TestExpr::Address { match_type, .. } => {

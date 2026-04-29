@@ -191,6 +191,7 @@ pub enum ConditionTest {
     False,
     Not,
     Body,
+    Hasflag,
 }
 
 impl ConditionTest {
@@ -205,6 +206,7 @@ impl ConditionTest {
             Self::False => "false",
             Self::Not => "not",
             Self::Body => "body",
+            Self::Hasflag => "hasflag",
         }
     }
 
@@ -219,6 +221,7 @@ impl ConditionTest {
             "false" => Some(Self::False),
             "not" => Some(Self::Not),
             "body" => Some(Self::Body),
+            "hasflag" => Some(Self::Hasflag),
             _ => None,
         }
     }

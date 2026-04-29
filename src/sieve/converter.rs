@@ -164,6 +164,23 @@ fn single_test_to_condition(expr: &TestExpr) -> Option<Condition> {
             header_names: header_names.clone(),
             ..Default::default()
         }),
+        TestExpr::Body { match_type, keys } => Some(Condition {
+            test_type: ConditionTest::Body,
+            keys: keys.clone(),
+            match_type: MatchType::from_sieve(match_type).unwrap_or(MatchType::Contains),
+            ..Default::default()
+        }),
+        TestExpr::HasFlag {
+            match_type,
+            variable_names,
+            flags,
+        } => Some(Condition {
+            test_type: ConditionTest::Hasflag,
+            header_names: variable_names.clone(),
+            keys: flags.clone(),
+            match_type: MatchType::from_sieve(match_type).unwrap_or(MatchType::Contains),
+            ..Default::default()
+        }),
         TestExpr::Not(inner) => {
             single_test_to_condition(inner).map(|mut c| {
                 c.negate = true;
@@ -304,6 +321,11 @@ fn condition_to_test_expr(cond: &Condition) -> TestExpr {
             match_type: cond.match_type.as_sieve().to_string(),
             keys: cond.keys.clone(),
         },
+        ConditionTest::Hasflag => TestExpr::HasFlag {
+            match_type: cond.match_type.as_sieve().to_string(),
+            variable_names: cond.header_names.clone(),
+            flags: cond.keys.clone(),
+        },
         ConditionTest::Not => TestExpr::True, // fallback
     };
 
@@ -348,6 +370,7 @@ fn collect_requires(rules: &[SieveRule]) -> Vec<String> {
         for cond in &rule.conditions {
             match cond.test_type {
                 ConditionTest::Body => { requires.insert("body".to_string()); }
+                ConditionTest::Hasflag => { requires.insert("imap4flags".to_string()); }
                 ConditionTest::Envelope => { requires.insert("envelope".to_string()); }
                 _ => {}
             }
@@ -396,6 +419,19 @@ if anyof (header :contains "From" "news@a.com", header :contains "From" "news@b.
 # Filter: HAPIMAG emails
 if address :is :domain "From" "hapimag.com" {
     fileinto "INBOX/Hapimag";
+}
+"#;
+
+    const IMAP4FLAGS_AND_BODY_SCRIPT: &str = r#"require ["fileinto", "body", "imap4flags"];
+
+# Filter: Flag marker
+if allof (not hasflag :is "$label", header :contains "from" ["example.invalid", "example.test"]) {
+    addflag "$label";
+}
+
+# Filter: Body text match
+if anyof (header :contains "From" "sender.example", body :contains :text "token.example") {
+    fileinto "Matched";
 }
 "#;
 
@@ -517,5 +553,35 @@ if address :is :domain "From" "hapimag.com" {
         assert_eq!(r.conditions[0].address_part, AddressPartType::Domain);
         assert_eq!(r.conditions[0].header_names, vec!["From"]);
         assert_eq!(r.conditions[0].keys, vec!["hapimag.com"]);
+    }
+
+    #[test]
+    fn test_parse_imap4flags_and_body_constructs() {
+        let script = text_to_script(IMAP4FLAGS_AND_BODY_SCRIPT, "server");
+        assert_eq!(script.rules.len(), 2);
+
+        let flag_marker = &script.rules[0];
+        assert_eq!(flag_marker.name, "Flag marker");
+        assert!(flag_marker.raw_block.is_none());
+        assert_eq!(flag_marker.conditions.len(), 2);
+        assert_eq!(flag_marker.conditions[0].test_type, ConditionTest::Hasflag);
+        assert!(flag_marker.conditions[0].negate);
+        assert_eq!(flag_marker.conditions[0].match_type, MatchType::Is);
+        assert_eq!(flag_marker.conditions[0].keys, vec!["$label"]);
+        assert_eq!(flag_marker.actions[0].action_type, ActionType::Addflag);
+        assert_eq!(flag_marker.actions[0].argument, "$label");
+
+        let body_match = &script.rules[1];
+        assert_eq!(body_match.name, "Body text match");
+        assert!(body_match.raw_block.is_none());
+        assert_eq!(body_match.logic, LogicOperator::AnyOf);
+        assert_eq!(body_match.conditions.len(), 2);
+        assert_eq!(body_match.conditions[1].test_type, ConditionTest::Body);
+        assert_eq!(body_match.conditions[1].match_type, MatchType::Contains);
+        assert_eq!(body_match.conditions[1].keys, vec!["token.example"]);
+
+        let roundtrip = script_to_text(&script);
+        assert!(roundtrip.contains("not hasflag :is \"$label\""));
+        assert!(roundtrip.contains("body :contains \"token.example\""));
     }
 }

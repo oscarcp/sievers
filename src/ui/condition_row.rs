@@ -29,6 +29,7 @@ impl std::fmt::Display for ConditionTestOption {
             ConditionTest::Size => write!(f, "Size"),
             ConditionTest::Exists => write!(f, "Exists"),
             ConditionTest::Body => write!(f, "Body"),
+            ConditionTest::Hasflag => write!(f, "Has Flag"),
             other => write!(f, "{}", other.as_sieve()),
         }
     }
@@ -40,6 +41,8 @@ pub const TEST_OPTIONS: &[ConditionTestOption] = &[
     ConditionTestOption(ConditionTest::Envelope),
     ConditionTestOption(ConditionTest::Size),
     ConditionTestOption(ConditionTest::Exists),
+    ConditionTestOption(ConditionTest::Body),
+    ConditionTestOption(ConditionTest::Hasflag),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +107,8 @@ pub fn view(cond: &Condition, number: usize) -> Element<'_, ConditionMessage> {
     let test_type = ConditionTestOption(cond.test_type);
     let is_size = cond.test_type == ConditionTest::Size;
     let is_exists = cond.test_type == ConditionTest::Exists;
+    let is_body = cond.test_type == ConditionTest::Body;
+    let is_hasflag = cond.test_type == ConditionTest::Hasflag;
     let is_address = matches!(
         cond.test_type,
         ConditionTest::Address | ConditionTest::Envelope
@@ -165,13 +170,16 @@ pub fn view(cond: &Condition, number: usize) -> Element<'_, ConditionMessage> {
         );
     }
 
-    // Header name (not for size)
-    if !is_size {
+    // Header/variable name (not for size or body)
+    if !is_size && !is_body {
         let headers = cond.header_names.join(", ");
         fields = fields.push(
             column![
-                label_text("Header"),
-                text_input("Header name", &headers)
+                label_text(if is_hasflag { "Variable" } else { "Header" }),
+                text_input(
+                    if is_hasflag { "Optional variable" } else { "Header name" },
+                    &headers
+                )
                     .on_input(ConditionMessage::SetHeaders)
                     .width(140),
             ]
@@ -218,10 +226,17 @@ pub fn view(cond: &Condition, number: usize) -> Element<'_, ConditionMessage> {
         } else {
             cond.keys.first().map(String::as_str).unwrap_or("")
         };
+        let value_label = if is_hasflag {
+            "Flag"
+        } else if is_body {
+            "Text"
+        } else {
+            "Value"
+        };
         fields = fields.push(
             column![
-                label_text("Value"),
-                text_input("Value", value)
+                label_text(value_label),
+                text_input(value_label, value)
                     .on_input(ConditionMessage::SetValue)
                     .width(Length::Fill),
             ]
